@@ -29,14 +29,15 @@ func update_opponent(player: PlayerState, is_active_turn: bool) -> void:
 	player_id = player.id
 	hand_count_label.text = "Hand: %d" % [player.group_a.size()]
 	
+	var prefix := "🤖 " if player.is_bot else "👤 "
 	if is_active_turn:
-		name_label.text = "▶  %s" % [player.name]
+		name_label.text = "▶  %s%s" % [prefix, player.name]
 		name_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.2)) # Glowing gold
 		modulate = Color(1.0, 1.0, 1.0)
 		if turn_badge:
 			turn_badge.visible = true
 	else:
-		name_label.text = player.name
+		name_label.text = "%s%s" % [prefix, player.name]
 		name_label.add_theme_color_override("font_color", Color(0.82, 0.86, 0.92))
 		modulate = Color(0.60, 0.65, 0.74) # Dimmed when not their turn
 		if turn_badge:

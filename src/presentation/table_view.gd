@@ -271,6 +271,9 @@ func _on_multiplayer_start_game_requested() -> void:
 	_connect_engine_signals()
 	network_manager.start_multiplayer_match(engine)
 	
+	current_player_count = engine.state.players.size()
+	_update_player_count_buttons()
+	
 	for p in engine.state.players:
 		if p.is_bot:
 			var bot := BotController.new(p.id, engine, 100 + p.id)

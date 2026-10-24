@@ -159,15 +159,15 @@ func update_lobby_peers(peers: Array[Dictionary]) -> void:
 	
 	for slot in range(peers.size(), selected_player_count):
 		if fill_bots_check.button_pressed:
-			peer_lines.append("🤖 [AI Bot Slot %d]" % [slot + 1])
+			peer_lines.append("🤖 [AI Bot: Bot %s (Slot %d)]" % ["Alpha" if slot == 1 else ("Beta" if slot == 2 else "Gamma"), slot + 1])
 		else:
 			peer_lines.append("⏳ [Waiting for player %d...]" % [slot + 1])
 	
-	peers_list_label.text = "Players in Room:\n" + "\n".join(peer_lines)
+	peers_list_label.text = "Players in Room (%dP):\n" % selected_player_count + "\n".join(peer_lines)
 	
 	# Also update Join tab status if client is connected
 	if not is_currently_hosting and join_status_label != null:
-		join_status_label.text = "✅ Connected to Host!\n\nPlayers in Room:\n" + "\n".join(peer_lines) + "\n\n⏳ Waiting for Host to start match..."
+		join_status_label.text = "✅ Connected to Host!\n\nPlayers in Room (%dP):\n" % selected_player_count + "\n".join(peer_lines) + "\n\n⏳ Waiting for Host to start match..."
 		join_status_label.add_theme_color_override("font_color", Color(0.2, 0.9, 0.4))
 	
 	# Update host Start Match button
@@ -175,7 +175,10 @@ func update_lobby_peers(peers: Array[Dictionary]) -> void:
 		var ready_to_start := (peers.size() >= selected_player_count) or fill_bots_check.button_pressed
 		start_match_btn.disabled = not ready_to_start
 		if peers.size() >= selected_player_count:
-			start_match_btn.text = "🚀 START MATCH (All Players Ready!)"
+			if selected_player_count == 2:
+				start_match_btn.text = "🚀 START MATCH (1v1 Human vs Human - No Bots!)"
+			else:
+				start_match_btn.text = "🚀 START MATCH (%d Humans - All Ready!)" % [peers.size()]
 		elif fill_bots_check.button_pressed:
 			var bot_count := selected_player_count - peers.size()
 			start_match_btn.text = "🚀 START MATCH (%d Human + %d Bot%s)" % [peers.size(), bot_count, "s" if bot_count > 1 else ""]
