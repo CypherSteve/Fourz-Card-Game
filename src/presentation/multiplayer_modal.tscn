@@ -1,0 +1,274 @@
+[gd_scene load_steps=2 format=3 uid="uid://c5m8p9q1r2s3t"]
+
+[ext_resource type="Script" path="res://src/presentation/multiplayer_modal.gd" id="1_modal"]
+
+[node name="MultiplayerModal" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_modal")
+
+[node name="Dimmer" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.68)
+
+[node name="Panel" type="Panel" parent="."]
+custom_minimum_size = Vector2(500, 390)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -195.0
+offset_right = 250.0
+offset_bottom = 195.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Header" type="HBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 20.0
+offset_top = 16.0
+offset_right = -20.0
+offset_bottom = 44.0
+grow_horizontal = 2
+
+[node name="TitleLabel" type="Label" parent="Panel/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.35, 1)
+theme_override_font_sizes/font_size = 18
+text = "🌐 MULTIPLAYER LOBBY"
+
+[node name="Spacer" type="Control" parent="Panel/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CloseButton" type="Button" parent="Panel/Header"]
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "✕"
+
+[node name="TabBar" type="HBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 20.0
+offset_top = 54.0
+offset_right = -20.0
+offset_bottom = 86.0
+grow_horizontal = 2
+theme_override_constants/separation = 12
+
+[node name="HostTabBtn" type="Button" parent="Panel/TabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 13
+text = "🏠 Host Room"
+
+[node name="JoinTabBtn" type="Button" parent="Panel/TabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 13
+text = "🔗 Join Room"
+
+[node name="HostContainer" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 98.0
+offset_right = -24.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+
+[node name="NameBox" type="HBoxContainer" parent="Panel/HostContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="Panel/HostContainer/NameBox"]
+custom_minimum_size = Vector2(85, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Your Name:"
+
+[node name="HostNameInput" type="LineEdit" parent="Panel/HostContainer/NameBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Host"
+
+[node name="PortBox" type="HBoxContainer" parent="Panel/HostContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="Panel/HostContainer/PortBox"]
+custom_minimum_size = Vector2(85, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Room Port:"
+
+[node name="HostPortInput" type="LineEdit" parent="Panel/HostContainer/PortBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "7777"
+
+[node name="CountBox" type="HBoxContainer" parent="Panel/HostContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="Panel/HostContainer/CountBox"]
+custom_minimum_size = Vector2(85, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Max Players:"
+
+[node name="Btn2P" type="Button" parent="Panel/HostContainer/CountBox"]
+custom_minimum_size = Vector2(50, 26)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "● 2P"
+
+[node name="Btn3P" type="Button" parent="Panel/HostContainer/CountBox"]
+custom_minimum_size = Vector2(50, 26)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "3P"
+
+[node name="Btn4P" type="Button" parent="Panel/HostContainer/CountBox"]
+custom_minimum_size = Vector2(50, 26)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "4P"
+
+[node name="FillBotsCheck" type="CheckBox" parent="Panel/HostContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+button_pressed = true
+text = "Fill empty slots with tactical AI bots"
+
+[node name="StartHostingBtn" type="Button" parent="Panel/HostContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "🌐 START HOSTING ROOM"
+
+[node name="HostInfoBox" type="VBoxContainer" parent="Panel/HostContainer"]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="LanIpLabel" type="Label" parent="Panel/HostContainer/HostInfoBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 11
+text = "📍 Local IP: 127.0.0.1  |  LAN IP: 192.168.1.1 (Port: 7777)"
+autowrap_mode = 2
+
+[node name="PeersListLabel" type="Label" parent="Panel/HostContainer/HostInfoBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 11
+text = "Players in Room:
+👑 Host (Player 0)
+🤖 [AI Bot Slot 2]"
+
+[node name="StartMatchBtn" type="Button" parent="Panel/HostContainer/HostInfoBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.2, 1)
+theme_override_font_sizes/font_size = 13
+text = "🚀 START MATCH"
+
+[node name="JoinContainer" type="VBoxContainer" parent="Panel"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 98.0
+offset_right = -24.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="NameBox" type="HBoxContainer" parent="Panel/JoinContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="Panel/JoinContainer/NameBox"]
+custom_minimum_size = Vector2(85, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Your Name:"
+
+[node name="JoinNameInput" type="LineEdit" parent="Panel/JoinContainer/NameBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "Guest"
+
+[node name="IpBox" type="HBoxContainer" parent="Panel/JoinContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="Panel/JoinContainer/IpBox"]
+custom_minimum_size = Vector2(85, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Host IP:"
+
+[node name="JoinIpInput" type="LineEdit" parent="Panel/JoinContainer/IpBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "127.0.0.1"
+placeholder_text = "e.g. 192.168.1.100 or 127.0.0.1"
+
+[node name="PortBox" type="HBoxContainer" parent="Panel/JoinContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="Panel/JoinContainer/PortBox"]
+custom_minimum_size = Vector2(85, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Port:"
+
+[node name="JoinPortInput" type="LineEdit" parent="Panel/JoinContainer/PortBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+text = "7777"
+
+[node name="ConnectBtn" type="Button" parent="Panel/JoinContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "🔗 CONNECT & JOIN ROOM"
+
+[node name="JoinStatusLabel" type="Label" parent="Panel/JoinContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.75, 0.85, 1)
+theme_override_font_sizes/font_size = 11
+text = "Enter the Host IP and click Connect to join."
+autowrap_mode = 2

@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3 uid="uid://b8y4g2v6q7m8a"]
+
+[ext_resource type="Script" path="res://src/presentation/card_view.gd" id="1_card_view"]
+
+[node name="CardView" type="Control"]
+custom_minimum_size = Vector2(84, 120)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 84.0
+offset_bottom = 120.0
+script = ExtResource("1_card_view")

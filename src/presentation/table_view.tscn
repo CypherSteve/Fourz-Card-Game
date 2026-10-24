@@ -1,0 +1,376 @@
+[gd_scene load_steps=7 format=3 uid="uid://c7v8w9x0y1z2a"]
+
+[ext_resource type="Script" path="res://src/presentation/table_view.gd" id="1_table_view"]
+[ext_resource type="PackedScene" uid="uid://df6h7j8k9l0m1" path="res://src/presentation/swap_overlay.tscn" id="2_swap_overlay"]
+[ext_resource type="PackedScene" uid="uid://e4r5t6y7u8i9o" path="res://src/presentation/burn_vfx.tscn" id="3_burn_vfx"]
+[ext_resource type="PackedScene" uid="uid://b6n5m4k3j2h1g" path="res://src/presentation/game_over_modal.tscn" id="4_modal"]
+[ext_resource type="PackedScene" path="res://src/presentation/opponent_view.tscn" id="5_opp_view"]
+[ext_resource type="PackedScene" path="res://src/presentation/multiplayer_modal.tscn" id="6_mp_modal"]
+
+[node name="TableView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_table_view")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.065, 0.18, 0.11, 1)
+
+[node name="HeaderBar" type="HBoxContainer" parent="."]
+z_index = 10
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 16.0
+offset_top = 8.0
+offset_right = -16.0
+offset_bottom = 40.0
+grow_horizontal = 2
+theme_override_constants/separation = 12
+
+[node name="PlayerCountBox" type="HBoxContainer" parent="HeaderBar"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Label" type="Label" parent="HeaderBar/PlayerCountBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.88, 0.95, 1)
+theme_override_font_sizes/font_size = 12
+text = "Players:"
+
+[node name="Btn2P" type="Button" parent="HeaderBar/PlayerCountBox"]
+custom_minimum_size = Vector2(36, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "2P"
+
+[node name="Btn3P" type="Button" parent="HeaderBar/PlayerCountBox"]
+custom_minimum_size = Vector2(36, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "3P"
+
+[node name="Btn4P" type="Button" parent="HeaderBar/PlayerCountBox"]
+custom_minimum_size = Vector2(36, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "4P"
+
+[node name="Spacer" type="Control" parent="HeaderBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MuteButton" type="Button" parent="HeaderBar"]
+custom_minimum_size = Vector2(70, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "🔊 Sound"
+
+[node name="RestartButton" type="Button" parent="HeaderBar"]
+custom_minimum_size = Vector2(80, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "🔄 Restart"
+
+[node name="MultiplayerButton" type="Button" parent="HeaderBar"]
+custom_minimum_size = Vector2(100, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "🌐 Multiplayer"
+
+[node name="OpponentsContainer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="OpponentTop" parent="OpponentsContainer" instance=ExtResource("5_opp_view")]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -150.0
+offset_top = 44.0
+offset_right = 150.0
+offset_bottom = 194.0
+grow_horizontal = 2
+
+[node name="OpponentLeft" parent="OpponentsContainer" instance=ExtResource("5_opp_view")]
+visible = false
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 16.0
+offset_top = -140.0
+offset_right = 316.0
+offset_bottom = 10.0
+grow_vertical = 2
+
+[node name="OpponentRight" parent="OpponentsContainer" instance=ExtResource("5_opp_view")]
+visible = false
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -316.0
+offset_top = -140.0
+offset_right = -16.0
+offset_bottom = 10.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="NotificationBanner" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -160.0
+offset_right = 280.0
+offset_bottom = -124.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="AnnouncementLabel" type="Label" parent="NotificationBanner"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.55, 1)
+theme_override_font_sizes/font_size = 13
+text = "Welcome to Fours!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CenterArea" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -110.0
+offset_right = 260.0
+offset_bottom = 35.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 40
+alignment = 1
+
+[node name="DrawPileContainer" type="Control" parent="CenterArea"]
+custom_minimum_size = Vector2(84, 140)
+layout_mode = 2
+
+[node name="CardBack" type="Panel" parent="CenterArea/DrawPileContainer"]
+custom_minimum_size = Vector2(84, 120)
+layout_mode = 0
+offset_right = 84.0
+offset_bottom = 120.0
+
+[node name="DrawCountLabel" type="Label" parent="CenterArea/DrawPileContainer"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -45.0
+offset_top = -18.0
+offset_right = 45.0
+offset_bottom = 2.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_font_sizes/font_size = 12
+text = "Draw: 80"
+horizontal_alignment = 1
+
+[node name="GroundPileContainer" type="Control" parent="CenterArea"]
+custom_minimum_size = Vector2(84, 140)
+layout_mode = 2
+
+[node name="EmptyPlaceholder" type="Panel" parent="CenterArea/GroundPileContainer"]
+custom_minimum_size = Vector2(84, 120)
+layout_mode = 0
+offset_right = 84.0
+offset_bottom = 120.0
+
+[node name="GroundCountLabel" type="Label" parent="CenterArea/GroundPileContainer"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -45.0
+offset_top = -18.0
+offset_right = 45.0
+offset_bottom = 2.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_font_sizes/font_size = 12
+text = "Ground: 0"
+horizontal_alignment = 1
+
+[node name="ComboBadge" type="Label" parent="CenterArea/GroundPileContainer"]
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -40.0
+offset_top = -24.0
+offset_right = 40.0
+offset_bottom = -2.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.1, 1)
+theme_override_font_sizes/font_size = 13
+text = "Combo x3"
+horizontal_alignment = 1
+
+[node name="GraveyardContainer" type="Control" parent="CenterArea"]
+custom_minimum_size = Vector2(84, 140)
+layout_mode = 2
+
+[node name="BurnPlaceholder" type="Panel" parent="CenterArea/GraveyardContainer"]
+custom_minimum_size = Vector2(84, 120)
+layout_mode = 0
+offset_right = 84.0
+offset_bottom = 120.0
+
+[node name="GraveyardCountLabel" type="Label" parent="CenterArea/GraveyardContainer"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -45.0
+offset_top = -18.0
+offset_right = 45.0
+offset_bottom = 2.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.95, 0.45, 0.35, 1)
+theme_override_font_sizes/font_size = 12
+text = "Burned: 0"
+horizontal_alignment = 1
+
+[node name="PlayerArea" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -450.0
+offset_top = -295.0
+offset_right = 450.0
+offset_bottom = -44.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 6
+alignment = 2
+
+[node name="PlayerTurnBadge" type="PanelContainer" parent="PlayerArea"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 4
+
+[node name="BadgeLabel" type="Label" parent="PlayerArea/PlayerTurnBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.08, 0.08, 0.1, 1)
+theme_override_font_sizes/font_size = 12
+text = " ⭐ YOUR TURN ⭐ "
+horizontal_alignment = 1
+
+[node name="TableCardsContainer" type="HBoxContainer" parent="PlayerArea"]
+custom_minimum_size = Vector2(380, 142)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="HandScroll" type="ScrollContainer" parent="PlayerArea"]
+custom_minimum_size = Vector2(820, 128)
+layout_mode = 2
+size_flags_horizontal = 4
+vertical_scroll_mode = 0
+
+[node name="HandCardsContainer" type="HBoxContainer" parent="PlayerArea/HandScroll"]
+layout_mode = 2
+size_flags_horizontal = 6
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="ActionBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -170.0
+offset_top = -38.0
+offset_right = 170.0
+offset_bottom = -6.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="PlayButton" type="Button" parent="ActionBar"]
+custom_minimum_size = Vector2(140, 32)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "PLAY SELECTED"
+
+[node name="PickupButton" type="Button" parent="ActionBar"]
+custom_minimum_size = Vector2(140, 32)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "PICK UP GROUND"
+
+[node name="AnimationLayer" type="Control" parent="."]
+z_index = 20
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="SwapOverlay" parent="." instance=ExtResource("2_swap_overlay")]
+visible = false
+layout_mode = 1
+
+[node name="BurnVFX" parent="." instance=ExtResource("3_burn_vfx")]
+layout_mode = 1
+
+[node name="GameOverModal" parent="." instance=ExtResource("4_modal")]
+visible = false
+layout_mode = 1
+
+[node name="MultiplayerModal" parent="." instance=ExtResource("6_mp_modal")]
+visible = false
+layout_mode = 1

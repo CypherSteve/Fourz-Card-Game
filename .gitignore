@@ -1,0 +1,17 @@
+# Godot 4 Engine cache and imported assets
+.godot/
+*.translation
+
+# Large binary files & executables
+Godot.exe
+*.exe
+*.x86_64
+*.apk
+*.pck
+*.zip
+
+# OS / Editor artifacts
+.DS_Store
+Thumbs.db
+*.tmp
+*.log

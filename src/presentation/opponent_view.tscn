@@ -1,0 +1,55 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/presentation/opponent_view.gd" id="1_opp_view"]
+
+[node name="OpponentView" type="VBoxContainer"]
+custom_minimum_size = Vector2(300, 160)
+anchors_preset = 0
+offset_right = 300.0
+offset_bottom = 160.0
+theme_override_constants/separation = 3
+alignment = 1
+script = ExtResource("1_opp_view")
+
+[node name="TurnBadge" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 4
+
+[node name="TurnLabel" type="Label" parent="TurnBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.08, 0.08, 0.1, 1)
+theme_override_font_sizes/font_size = 11
+text = " ▶ PLAYING "
+horizontal_alignment = 1
+
+[node name="NameLabel" type="Label" parent="."]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Bot Alpha"
+horizontal_alignment = 1
+
+[node name="HandBox" type="HBoxContainer" parent="."]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="HandCountLabel" type="Label" parent="HandBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.86, 0.94, 1)
+theme_override_font_sizes/font_size = 11
+text = "Hand: 4"
+horizontal_alignment = 1
+
+[node name="MiniCards" type="HBoxContainer" parent="HandBox"]
+layout_mode = 2
+theme_override_constants/separation = -6
+alignment = 1
+
+[node name="TableCardsContainer" type="HBoxContainer" parent="."]
+custom_minimum_size = Vector2(280, 114)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 6
+alignment = 1
