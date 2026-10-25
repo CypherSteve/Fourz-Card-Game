@@ -195,7 +195,33 @@ func on_connection_failed(msg: String = "Connection failed.") -> void:
 	connect_btn.disabled = false
 
 static func get_lan_ip() -> String:
-	for ip in IP.get_local_addresses():
-		if ip.find(".") != -1 and not ip.begins_with("127.") and not ip.begins_with("169.254."):
+	var addresses := IP.get_local_addresses()
+	
+	# Priority 1: Standard Home Wi-Fi / LAN router range (192.168.x.x)
+	for ip in addresses:
+		if ip.begins_with("192.168."):
 			return ip
+	
+	# Priority 2: Standard Class A private LAN (10.x.x.x)
+	for ip in addresses:
+		if ip.begins_with("10."):
+			return ip
+	
+	# Priority 3: Other valid non-loopback, non-link-local, non-docker IPs
+	for ip in addresses:
+		if ip.find(".") != -1 and not ip.begins_with("127.") and not ip.begins_with("169.254."):
+			# Exclude Docker / WSL / virtual container subnets (172.16.x.x to 172.31.x.x)
+			if ip.begins_with("172."):
+				var parts := ip.split(".")
+				if parts.size() >= 2:
+					var second_octet := int(parts[1])
+					if second_octet >= 16 and second_octet <= 31:
+						continue # Skip Docker virtual adapter
+			return ip
+	
+	# Fallback if only Docker / local exists
+	for ip in addresses:
+		if ip.find(".") != -1 and not ip.begins_with("127."):
+			return ip
+			
 	return "127.0.0.1"

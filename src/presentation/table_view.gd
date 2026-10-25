@@ -98,6 +98,8 @@ func _ready() -> void:
 	if multiplayer_btn:
 		multiplayer_btn.pressed.connect(func() -> void:
 			audio_manager.play_click()
+			if notification_banner:
+				notification_banner.visible = false
 			multiplayer_modal.open()
 		)
 	
@@ -1082,13 +1084,17 @@ func _on_swap_ready_toggled(ready: bool) -> void:
 		engine.set_player_ready(local_player_id, ready)
 
 func show_announcement(msg: String, duration: float = 2.5) -> void:
+	if notification_banner == null or announcement_label == null:
+		return
+	if multiplayer_modal != null and multiplayer_modal.visible:
+		return
 	announcement_label.text = msg
-	announcement_label.visible = true
+	notification_banner.visible = true
 	var tween := create_tween()
 	tween.tween_interval(duration)
 	tween.tween_callback(func() -> void:
 		if announcement_label.text == msg:
-			announcement_label.visible = false
+			notification_banner.visible = false
 	)
 
 func shake_screen(intensity: float = 8.0, duration: float = 0.35) -> void:

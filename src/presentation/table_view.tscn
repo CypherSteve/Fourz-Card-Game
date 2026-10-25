@@ -135,6 +135,7 @@ grow_horizontal = 0
 grow_vertical = 2
 
 [node name="NotificationBanner" type="Panel" parent="."]
+visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
