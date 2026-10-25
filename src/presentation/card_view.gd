@@ -172,6 +172,14 @@ func update_view() -> void:
 		return
 	
 	if data == null:
+		if not is_face_up:
+			visible = true
+			back_pattern.visible = true
+			background_panel.visible = false
+			corner_top_left.visible = false
+			corner_bottom_right.visible = false
+			center_label.visible = false
+			return
 		visible = false
 		return
 	

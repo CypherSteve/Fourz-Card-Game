@@ -99,17 +99,17 @@ static func determine_starting_player(players: Array[PlayerState], rng: RandomNu
 		return 0
 	
 	var best_player_index: int = 0
-	var best_card: CardData = players[0].get_lowest_hand_card()
-	var best_weight: int = PlayerState.get_starting_rank_weight(best_card.rank) if best_card != null else 999
+	var best_card: CardData = null
+	var best_weight: int = 999
 	
-	for i in range(1, players.size()):
+	for i in range(players.size()):
 		var candidate_card: CardData = players[i].get_lowest_hand_card()
 		if candidate_card == null:
 			continue
 		
 		var candidate_weight: int = PlayerState.get_starting_rank_weight(candidate_card.rank)
 		
-		if candidate_weight < best_weight:
+		if best_card == null or candidate_weight < best_weight:
 			best_player_index = i
 			best_card = candidate_card
 			best_weight = candidate_weight

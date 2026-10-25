@@ -2,6 +2,7 @@ class_name TestRunner
 extends SceneTree
 
 const TestNetwork = preload("res://src/tests/test_network.gd")
+const TestScenes = preload("res://src/tests/test_scenes.gd")
 
 func _init() -> void:
 	print("\n==========================================")
@@ -9,6 +10,9 @@ func _init() -> void:
 	print("==========================================\n")
 	
 	var all_passed: bool = true
+	
+	if not TestScenes.run():
+		all_passed = false
 	
 	if not TestDeck.run():
 		all_passed = false

@@ -16,7 +16,7 @@ signal cards_played(player_id: int, cards: Array[CardData], group_name: String)
 signal blind_card_revealed(player_id: int, card: CardData, is_valid: bool)
 signal pile_burned(player_id: int, reason: String)
 signal pile_collected(player_id: int, card_count: int)
-signal cards_drawn(player_id: int, card_count: int)
+signal cards_drawn(player_id: int, card_count: int, drawn_cards: Array[CardData])
 signal game_won(winner_id: int)
 
 var state: GameState
@@ -159,8 +159,15 @@ func play_cards(player_id: int, card_indices: Array[int]) -> Dictionary:
 		return {"success": false, "reason": "No cards selected."}
 	
 	# Check for duplicates or out-of-range indices
+	var unique_indices: Array[int] = []
+	for idx in card_indices:
+		if not unique_indices.has(idx):
+			unique_indices.append(idx)
+		else:
+			return {"success": false, "reason": "Duplicate card index in play request."}
+	
 	var selected_cards: Array[CardData] = []
-	var sorted_indices := card_indices.duplicate()
+	var sorted_indices := unique_indices.duplicate()
 	sorted_indices.sort()
 	sorted_indices.reverse() # Reverse sort for safe removal later
 	
@@ -305,7 +312,7 @@ func _refill_hand_if_needed(player: PlayerState) -> void:
 		for card in drawn:
 			player.group_a.append(card)
 		player.sort_hand()
-		cards_drawn.emit(player.id, drawn.size())
+		cards_drawn.emit(player.id, drawn.size(), drawn)
 
 func _handle_win(player: PlayerState) -> void:
 	state.phase = GameState.GamePhase.GAME_OVER

@@ -55,6 +55,10 @@ static func run() -> bool:
 	var next_id := next_player.id
 	var initial_hand_size := next_player.group_a.size()
 	
+	# Test duplicate index rejection in play_cards
+	var dup_play := engine.play_cards(next_id, [0, 0])
+	assert(not dup_play.success, "Duplicate indices must be rejected.")
+	
 	var pickup_res := engine.pick_up_ground(next_id)
 	assert(pickup_res.success, "Pickup should succeed.")
 	assert(engine.state.ground_count() == 0, "Ground should be empty after pickup.")

@@ -29,7 +29,7 @@ func _ready() -> void:
 		_players.append(p)
 
 func _play_stream(stream: AudioStreamWAV, volume_db: float = 0.0) -> void:
-	if is_muted or stream == null:
+	if is_muted or stream == null or _players.is_empty():
 		return
 	var player: AudioStreamPlayer = _players[_player_index]
 	_player_index = (_player_index + 1) % POOL_SIZE

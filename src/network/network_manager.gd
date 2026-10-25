@@ -292,17 +292,13 @@ func _on_host_cards_dealt() -> void:
 		
 		rpc_id(p_peer_id, "rpc_sync_cards_dealt", players_data, engine.state.deck.count())
 
-func _on_host_cards_drawn(player_id: int, count: int) -> void:
+func _on_host_cards_drawn(player_id: int, count: int, drawn_cards: Array[CardData] = []) -> void:
 	var target_peer: int = player_id_to_peer.get(player_id, -1)
-	var player := engine.state.get_player_by_id(player_id)
 	
-	# Send drawn cards to owner, and dummy counts to other players
+	# Send exact drawn cards to owner, and empty array to other players to preserve private hands
 	var drawn_cards_dict: Array[Dictionary] = []
-	if player != null:
-		# The drawn cards are at the end of group_a
-		var start_idx := maxi(0, player.group_a.size() - count)
-		for i in range(start_idx, player.group_a.size()):
-			drawn_cards_dict.append(player.group_a[i].to_dict())
+	for c in drawn_cards:
+		drawn_cards_dict.append(c.to_dict())
 	
 	for peer_info in lobby_peers:
 		var p_peer: int = peer_info.peer_id

@@ -20,6 +20,7 @@ const SwapOverlay = preload("res://src/presentation/swap_overlay.gd")
 @onready var btn_3p: Button = $HeaderBar/PlayerCountBox/Btn3P
 @onready var btn_4p: Button = $HeaderBar/PlayerCountBox/Btn4P
 
+@onready var notification_banner: Panel = $NotificationBanner
 @onready var announcement_label: Label = $NotificationBanner/AnnouncementLabel
 @onready var burn_vfx: BurnVFX = $BurnVFX
 @onready var game_over_modal: GameOverModal = $GameOverModal
@@ -330,7 +331,10 @@ func _connect_client_network_signals() -> void:
 	)
 	
 	network_manager.net_turn_started.connect(func(active_p_id: int, active_group: String) -> void:
-		engine.state.current_player_index = active_p_id
+		for idx in range(engine.state.players.size()):
+			if engine.state.players[idx].id == active_p_id:
+				engine.state.current_player_index = idx
+				break
 		_on_turn_started(active_p_id, active_group)
 	)
 	
@@ -343,21 +347,45 @@ func _connect_client_network_signals() -> void:
 			for c in cards:
 				ranks_to_remove.append(c.rank)
 			for r in ranks_to_remove:
-				for i in range(p.group_a.size() - 1, -1, -1):
-					if p.group_a[i].rank == r:
-						p.group_a.remove_at(i)
-						break
+				if active_group == "A":
+					for i in range(p.group_a.size() - 1, -1, -1):
+						if p.group_a[i].rank == r:
+							p.group_a.remove_at(i)
+							break
+				elif active_group == "B":
+					for i in range(p.group_b.size() - 1, -1, -1):
+						if p.group_b[i].rank == r:
+							p.group_b.remove_at(i)
+							break
+				elif active_group == "C":
+					if not p.group_c.is_empty():
+						p.group_c.pop_back()
 		elif p != null:
 			for _c in cards:
-				if not p.group_a.is_empty():
+				if active_group == "A" and not p.group_a.is_empty():
+					p.group_a.pop_back()
+				elif active_group == "B" and not p.group_b.is_empty():
+					p.group_b.pop_back()
+				elif active_group == "C" and not p.group_c.is_empty():
+					p.group_c.pop_back()
+				elif not p.group_a.is_empty():
 					p.group_a.pop_back()
 				elif not p.group_b.is_empty():
 					p.group_b.pop_back()
+				elif not p.group_c.is_empty():
+					p.group_c.pop_back()
 		
 		_on_cards_played(p_id, cards, active_group)
 	)
 	
-	network_manager.net_blind_card_revealed.connect(_on_blind_card_revealed)
+	network_manager.net_blind_card_revealed.connect(func(p_id: int, card: CardData, is_valid: bool) -> void:
+		if not is_valid:
+			# Failed blind card flip was popped on host; mirror pop on client
+			var p := engine.state.get_player_by_id(p_id)
+			if p != null and not p.group_c.is_empty():
+				p.group_c.pop_back()
+		_on_blind_card_revealed(p_id, card, is_valid)
+	)
 	
 	network_manager.net_pile_burned.connect(func(p_id: int, reason: String) -> void:
 		for c in engine.state.ground_stack:
@@ -371,6 +399,8 @@ func _connect_client_network_signals() -> void:
 		if p != null:
 			for c in engine.state.ground_stack:
 				p.group_a.append(c)
+			if p.id == local_player_id:
+				p.sort_hand()
 		engine.state.ground_stack.clear()
 		_on_pile_collected(p_id, count)
 	)
@@ -388,7 +418,7 @@ func _connect_client_network_signals() -> void:
 		for _i in range(count):
 			if not engine.state.deck.is_empty():
 				engine.state.deck.cards.pop_back()
-		_on_cards_drawn(p_id, count)
+		_on_cards_drawn(p_id, count, drawn_cards)
 	)
 	
 	network_manager.net_game_won.connect(_on_game_won)
@@ -479,7 +509,7 @@ func _on_turn_started(active_player_id: int, active_group: String) -> void:
 		# Give bot realistic thinking delay (0.9s) only if bot controller exists locally
 		if bot_controllers.has(active_player_id):
 			get_tree().create_timer(0.9).timeout.connect(func() -> void:
-				if engine.state.phase == GameState.GamePhase.PLAYING and engine.state.current_player_index == active_player_id:
+				if engine.state.phase == GameState.GamePhase.PLAYING and engine.state.get_current_player() != null and engine.state.get_current_player().id == active_player_id:
 					if bot_controllers.has(active_player_id):
 						bot_controllers[active_player_id].on_turn_started(active_group)
 			)
@@ -537,8 +567,8 @@ func _on_pile_collected(player_id: int, count: int) -> void:
 		update_pile_counts()
 	)
 
-func _on_cards_drawn(player_id: int, count: int) -> void:
-	if player_id == 0:
+func _on_cards_drawn(player_id: int, count: int, _drawn: Array[CardData] = []) -> void:
+	if player_id == local_player_id:
 		show_announcement("Drew %d card(s) from Side Stack." % [count], 1.5)
 	
 	var from_pos := draw_pile_view.global_position
@@ -555,7 +585,7 @@ func _on_game_won(winner_id: int) -> void:
 	play_button.disabled = true
 	pickup_button.disabled = true
 	
-	var is_player := (winner_id == 0)
+	var is_player := (winner_id == local_player_id)
 	if is_player:
 		audio_manager.play_victory()
 	else:
@@ -653,7 +683,7 @@ func animate_cards_to_ground(cards: Array[CardData], from_pos: Vector2, to_pos: 
 		)
 
 func animate_pickup_stack(from_pos: Vector2, to_pos: Vector2, count: int, on_complete: Callable) -> void:
-	if not is_inside_tree() or animation_layer == null:
+	if not is_inside_tree() or animation_layer == null or count <= 0:
 		on_complete.call()
 		return
 	
@@ -756,6 +786,10 @@ func animate_dealing_cascade(on_complete: Callable) -> void:
 		targets.append(_get_player_global_pos(i))
 	
 	var total_cards := targets.size() * 3
+	if targets.is_empty() or total_cards <= 0:
+		on_complete.call()
+		return
+	
 	var finished_count := 0
 	
 	audio_manager.play_card_slide()
@@ -813,7 +847,8 @@ func render_all_cards() -> void:
 func _render_opponents() -> void:
 	if engine == null or engine.state.players.is_empty():
 		return
-	var current_turn := engine.state.current_player_index
+	var active_p := engine.state.get_current_player()
+	var active_id: int = active_p.id if active_p != null else -1
 	
 	if current_player_count == 2:
 		opp_top.visible = true
@@ -822,7 +857,7 @@ func _render_opponents() -> void:
 		var opp_id := (local_player_id + 1) % 2
 		var opp := engine.state.get_player_by_id(opp_id)
 		if opp != null:
-			opp_top.update_opponent(opp, current_turn == opp_id)
+			opp_top.update_opponent(opp, active_id == opp_id)
 	elif current_player_count == 3:
 		opp_top.visible = false
 		opp_left.visible = true
@@ -832,9 +867,9 @@ func _render_opponents() -> void:
 		var p_left := engine.state.get_player_by_id(left_id)
 		var p_right := engine.state.get_player_by_id(right_id)
 		if p_left != null:
-			opp_left.update_opponent(p_left, current_turn == left_id)
+			opp_left.update_opponent(p_left, active_id == left_id)
 		if p_right != null:
-			opp_right.update_opponent(p_right, current_turn == right_id)
+			opp_right.update_opponent(p_right, active_id == right_id)
 	elif current_player_count == 4:
 		opp_left.visible = true
 		opp_top.visible = true
@@ -846,11 +881,11 @@ func _render_opponents() -> void:
 		var p_top := engine.state.get_player_by_id(top_id)
 		var p_right := engine.state.get_player_by_id(right_id)
 		if p_left != null:
-			opp_left.update_opponent(p_left, current_turn == left_id)
+			opp_left.update_opponent(p_left, active_id == left_id)
 		if p_top != null:
-			opp_top.update_opponent(p_top, current_turn == top_id)
+			opp_top.update_opponent(p_top, active_id == top_id)
 		if p_right != null:
-			opp_right.update_opponent(p_right, current_turn == right_id)
+			opp_right.update_opponent(p_right, active_id == right_id)
 
 func _render_table_group(container: HBoxContainer, player: PlayerState, is_human: bool) -> void:
 	for child in container.get_children():
@@ -868,7 +903,8 @@ func _render_table_group(container: HBoxContainer, player: PlayerState, is_human
 			slot_box.add_child(c_card)
 			c_card.position = Vector2(0, 0)
 			c_card.set_card(player.group_c[i], false, "C", i)
-			c_card.is_interactive = is_human and (engine.state.phase == GameState.GamePhase.PLAYING) and (player.get_active_group_name() == "C")
+			var is_my_turn := (engine.state.get_current_player() != null and engine.state.get_current_player().id == local_player_id)
+			c_card.is_interactive = is_human and is_my_turn and (engine.state.phase == GameState.GamePhase.PLAYING) and (player.get_active_group_name() == "C")
 			c_card.card_clicked.connect(_on_table_card_clicked)
 		
 		# Group B (Face up, shifted 22px down for peek)
@@ -879,8 +915,9 @@ func _render_table_group(container: HBoxContainer, player: PlayerState, is_human
 			b_card.set_card(player.group_b[i], true, "B", i)
 			
 			if is_human:
+				var is_my_turn := (engine.state.get_current_player() != null and engine.state.get_current_player().id == local_player_id)
 				var is_swap_phase := engine.state.phase == GameState.GamePhase.SWAP_PHASE
-				var is_active_b := (engine.state.phase == GameState.GamePhase.PLAYING) and (player.get_active_group_name() == "B")
+				var is_active_b := is_my_turn and (engine.state.phase == GameState.GamePhase.PLAYING) and (player.get_active_group_name() == "B")
 				b_card.is_interactive = is_swap_phase or is_active_b
 				b_card.set_selected(selected_swap_table_idx == i or selected_hand_indices.has(i))
 				b_card.card_clicked.connect(_on_table_card_clicked)
@@ -891,7 +928,8 @@ func _render_player_hand(player: PlayerState) -> void:
 	for child in player_hand_container.get_children():
 		child.queue_free()
 	
-	var is_human_turn := (engine.state.phase == GameState.GamePhase.PLAYING) and (engine.state.current_player_index == 0) and (player.get_active_group_name() == "A")
+	var is_my_turn := (engine.state.get_current_player() != null and engine.state.get_current_player().id == local_player_id)
+	var is_human_turn := (engine.state.phase == GameState.GamePhase.PLAYING) and is_my_turn and (player.get_active_group_name() == "A")
 	var is_swap := engine.state.phase == GameState.GamePhase.SWAP_PHASE
 	
 	for i in range(player.group_a.size()):
@@ -975,7 +1013,8 @@ func _on_hand_card_clicked(card_view: CardView) -> void:
 		_attempt_swap()
 		return
 	
-	if engine.state.phase != GameState.GamePhase.PLAYING or engine.state.current_player_index != local_player_id:
+	var is_my_turn := (engine.state.get_current_player() != null and engine.state.get_current_player().id == local_player_id)
+	if engine.state.phase != GameState.GamePhase.PLAYING or not is_my_turn:
 		return
 	
 	var human := engine.state.get_player_by_id(local_player_id)
@@ -1003,7 +1042,8 @@ func _on_table_card_clicked(card_view: CardView) -> void:
 		_attempt_swap()
 		return
 	
-	if engine.state.phase != GameState.GamePhase.PLAYING or engine.state.current_player_index != local_player_id:
+	var is_my_turn := (engine.state.get_current_player() != null and engine.state.get_current_player().id == local_player_id)
+	if engine.state.phase != GameState.GamePhase.PLAYING or not is_my_turn:
 		return
 	
 	var player := engine.state.get_player_by_id(local_player_id)
