@@ -8,13 +8,13 @@ extends Control
 const AudioManager = preload("res://src/presentation/audio_manager.gd")
 const MultiplayerModalClass = preload("res://src/presentation/multiplayer_modal.gd")
 
-@onready var btn_solo_2p: Button = $CenterArea/MenuCard/SoloBox/SoloButtons/Btn2P
-@onready var btn_solo_3p: Button = $CenterArea/MenuCard/SoloBox/SoloButtons/Btn3P
-@onready var btn_solo_4p: Button = $CenterArea/MenuCard/SoloBox/SoloButtons/Btn4P
+@onready var btn_solo_2p: Button = $CenterArea/MenuCard/CardContent/SoloBox/SoloButtons/Btn2P
+@onready var btn_solo_3p: Button = $CenterArea/MenuCard/CardContent/SoloBox/SoloButtons/Btn3P
+@onready var btn_solo_4p: Button = $CenterArea/MenuCard/CardContent/SoloBox/SoloButtons/Btn4P
 
-@onready var btn_multiplayer: Button = $CenterArea/MenuCard/BtnMultiplayer
-@onready var btn_rules: Button = $CenterArea/MenuCard/BtnRules
-@onready var btn_quit: Button = $CenterArea/MenuCard/BtnQuit
+@onready var btn_multiplayer: Button = $CenterArea/MenuCard/CardContent/BtnMultiplayer
+@onready var btn_rules: Button = $CenterArea/MenuCard/CardContent/BtnRules
+@onready var btn_quit: Button = $CenterArea/MenuCard/CardContent/BtnQuit
 
 @onready var btn_sound: Button = $TopBar/SoundButton
 @onready var multiplayer_modal: MultiplayerModalClass = $MultiplayerModal

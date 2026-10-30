@@ -31,9 +31,13 @@ static func run() -> bool:
 			success = false
 			continue
 		
-		# Scene instantiated successfully without parse/script errors
+		# Verify entering scene tree so all @onready paths and _ready() functions execute
+		var tree := Engine.get_main_loop() as SceneTree
+		if tree and tree.root:
+			tree.root.add_child(instance)
+			tree.root.remove_child(instance)
 		instance.free()
-		print("  [PASS] Successfully compiled and instantiated: ", scene_path.get_file())
+		print("  [PASS] Successfully compiled, instantiated, and initialized: ", scene_path.get_file())
 	
 	# Verify all standalone scripts parse and load cleanly
 	var scripts_to_test: Array[String] = [
