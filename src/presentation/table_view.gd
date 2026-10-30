@@ -562,6 +562,8 @@ func _on_net_game_won(winner_id: int) -> void:
 # ==========================================
 
 func _on_cards_dealt() -> void:
+	render_all_cards()
+	update_pile_counts()
 	animate_dealing_cascade(func() -> void:
 		render_all_cards()
 		update_pile_counts()
@@ -572,6 +574,8 @@ func _on_swap_phase_started(duration: float) -> void:
 	swap_overlay.update_time(duration)
 	play_button.visible = false
 	pickup_button.visible = false
+	render_all_cards()
+	update_pile_counts()
 	show_announcement("Strategy Phase! Click 1 Hand & 1 Table card to swap.", 3.0)
 	
 	# Let bots execute their swaps after a brief delay
@@ -776,7 +780,7 @@ func animate_cards_to_ground(cards: Array[CardData], from_pos: Vector2, to_pos: 
 		return
 	
 	var total_cards := cards.size()
-	var completed_count := 0
+	var completed_count: Array[int] = [0]
 	
 	audio_manager.play_card_slide()
 	
@@ -811,8 +815,8 @@ func animate_cards_to_ground(cards: Array[CardData], from_pos: Vector2, to_pos: 
 		tween.finished.connect(func() -> void:
 			if is_instance_valid(ghost):
 				ghost.queue_free()
-			completed_count += 1
-			if completed_count == total_cards:
+			completed_count[0] += 1
+			if completed_count[0] >= total_cards:
 				on_complete.call()
 		)
 
@@ -822,7 +826,7 @@ func animate_pickup_stack(from_pos: Vector2, to_pos: Vector2, count: int, on_com
 		return
 	
 	var num_visual := mini(count, 3)
-	var completed := 0
+	var completed: Array[int] = [0]
 	
 	for i in range(num_visual):
 		var ghost := card_scene.instantiate() as CardView
@@ -845,8 +849,8 @@ func animate_pickup_stack(from_pos: Vector2, to_pos: Vector2, count: int, on_com
 		tween.finished.connect(func() -> void:
 			if is_instance_valid(ghost):
 				ghost.queue_free()
-			completed += 1
-			if completed == num_visual:
+			completed[0] += 1
+			if completed[0] >= num_visual:
 				on_complete.call()
 		)
 
@@ -882,7 +886,7 @@ func animate_draw_cards(from_pos: Vector2, to_pos: Vector2, count: int, on_compl
 		return
 	
 	var num_visual := mini(count, 4)
-	var completed := 0
+	var completed: Array[int] = [0]
 	
 	for i in range(num_visual):
 		var ghost := card_scene.instantiate() as CardView
@@ -904,8 +908,8 @@ func animate_draw_cards(from_pos: Vector2, to_pos: Vector2, count: int, on_compl
 		tween.finished.connect(func() -> void:
 			if is_instance_valid(ghost):
 				ghost.queue_free()
-			completed += 1
-			if completed == num_visual:
+			completed[0] += 1
+			if completed[0] >= num_visual:
 				on_complete.call()
 		)
 
@@ -924,7 +928,7 @@ func animate_dealing_cascade(on_complete: Callable) -> void:
 		on_complete.call()
 		return
 	
-	var finished_count := 0
+	var finished_count: Array[int] = [0]
 	
 	audio_manager.play_card_slide()
 	
@@ -949,8 +953,8 @@ func animate_dealing_cascade(on_complete: Callable) -> void:
 			tween.finished.connect(func() -> void:
 				if is_instance_valid(ghost):
 					ghost.queue_free()
-				finished_count += 1
-				if finished_count == total_cards:
+				finished_count[0] += 1
+				if finished_count[0] >= total_cards:
 					on_complete.call()
 			)
 
