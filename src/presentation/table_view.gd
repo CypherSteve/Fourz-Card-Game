@@ -115,26 +115,16 @@ func _ready() -> void:
 		multiplayer_modal.join_match_requested.connect(_on_join_match_requested)
 		multiplayer_modal.start_game_requested.connect(_on_multiplayer_start_game_requested)
 	
-	network_manager.host_started.connect(func(port: int) -> void:
-		show_announcement("Hosting room on port %d" % port, 2.5)
-	)
-	network_manager.lobby_updated.connect(func(peers: Array[Dictionary]) -> void:
-		multiplayer_modal.update_lobby_peers(peers)
-	)
-	network_manager.connection_succeeded.connect(func() -> void:
-		multiplayer_modal.on_connection_success()
-	)
-	network_manager.connection_failed.connect(func() -> void:
-		multiplayer_modal.on_connection_failed("Failed to connect to host.")
-	)
-	network_manager.server_disconnected.connect(func() -> void:
-		show_announcement("Host disconnected. Returning to Main Menu...", 3.0)
-		get_tree().create_timer(2.0).timeout.connect(func() -> void:
-			if is_inside_tree():
-				get_tree().change_scene_to_file("res://src/presentation/main_menu.tscn")
-		)
-	)
-	network_manager.match_started_network.connect(_on_network_match_started)
+	if not network_manager.host_started.is_connected(_on_net_host_started):
+		network_manager.host_started.connect(_on_net_host_started)
+	if not network_manager.lobby_updated.is_connected(_on_net_lobby_updated):
+		network_manager.lobby_updated.connect(_on_net_lobby_updated)
+	if not network_manager.connection_succeeded.is_connected(_on_net_connection_succeeded):
+		network_manager.connection_succeeded.connect(_on_net_connection_succeeded)
+	if not network_manager.connection_failed.is_connected(_on_net_connection_failed):
+		network_manager.connection_failed.connect(_on_net_connection_failed)
+	if not network_manager.server_disconnected.is_connected(_on_net_server_disconnected):
+		network_manager.server_disconnected.connect(_on_net_server_disconnected)
 	
 	play_button.pressed.connect(_on_play_button_pressed)
 	pickup_button.pressed.connect(_on_pickup_button_pressed)
@@ -173,7 +163,7 @@ func _ready() -> void:
 		if network_manager.is_server():
 			_setup_host_session()
 		else:
-			_on_network_match_started(network_manager.pending_multiplayer_configs, network_manager.pending_assigned_id)
+			_setup_client_session()
 	else:
 		if network_manager != null:
 			current_player_count = network_manager.pending_player_count
@@ -229,6 +219,7 @@ func _connect_engine_signals() -> void:
 	engine.swap_time_updated.connect(_on_swap_time_updated)
 	engine.swap_phase_ended.connect(_on_swap_phase_ended)
 	engine.card_swapped.connect(_on_card_swapped)
+	engine.player_ready_changed.connect(_on_player_ready_changed)
 	engine.turn_started.connect(_on_turn_started)
 	engine.cards_played.connect(_on_cards_played)
 	engine.blind_card_revealed.connect(_on_blind_card_revealed)
@@ -293,7 +284,31 @@ func _on_join_match_requested(address: String, port: int, player_name: String) -
 	if err != OK:
 		multiplayer_modal.on_connection_failed(error_string(err))
 
+func _on_net_host_started(port: int) -> void:
+	show_announcement("Hosting room on port %d" % port, 2.5)
+
+func _on_net_lobby_updated(peers: Array[Dictionary]) -> void:
+	if multiplayer_modal:
+		multiplayer_modal.update_lobby_peers(peers)
+
+func _on_net_connection_succeeded() -> void:
+	if multiplayer_modal:
+		multiplayer_modal.on_connection_success()
+
+func _on_net_connection_failed(reason: String = "Failed to connect to host.") -> void:
+	if multiplayer_modal:
+		multiplayer_modal.on_connection_failed(reason)
+
+func _on_net_server_disconnected() -> void:
+	show_announcement("Host disconnected. Returning to Main Menu...", 3.0)
+	get_tree().create_timer(2.0).timeout.connect(func() -> void:
+		if is_inside_tree():
+			get_tree().change_scene_to_file("res://src/presentation/main_menu.tscn")
+	)
+
 func _setup_host_session() -> void:
+	if multiplayer_modal:
+		multiplayer_modal.close()
 	_cleanup_previous_match()
 	is_multiplayer_client = false
 	local_player_id = 0
@@ -305,30 +320,26 @@ func _setup_host_session() -> void:
 		btn_3p.disabled = true
 		btn_4p.disabled = true
 	
-	engine = network_manager.engine
-	if engine == null:
-		engine = GameEngine.new()
-		_connect_engine_signals()
-		network_manager.start_multiplayer_match(engine)
-	else:
-		_connect_engine_signals()
-	
-	current_player_count = engine.state.players.size()
+	current_player_count = network_manager.pending_player_count
 	_update_player_count_buttons()
 	
-	for p in engine.state.players:
-		if p.is_bot:
-			var bot := BotController.new(p.id, engine, 100 + p.id)
-			bot_controllers[p.id] = bot
+	engine = GameEngine.new()
+	network_manager.engine = engine
+	_connect_engine_signals()
 	
-	render_all_cards()
-	update_pile_counts()
-	show_announcement("Multiplayer room active! You are Host (Player 0).", 2.5)
+	for config in network_manager.pending_multiplayer_configs:
+		if config.get("is_bot", false):
+			var bot_id: int = int(config.get("id", 0))
+			var bot := BotController.new(bot_id, engine, 100 + bot_id)
+			bot_controllers[bot_id] = bot
+	
+	show_announcement("Multiplayer room active! Waiting for peers to load...", 3.0)
+	network_manager.host_scene_ready_and_check()
 
 func _on_multiplayer_start_game_requested() -> void:
 	_setup_host_session()
 
-func _on_network_match_started(configs: Array[Dictionary], assigned_player_id: int) -> void:
+func _setup_client_session() -> void:
 	if multiplayer_modal:
 		multiplayer_modal.close()
 	_cleanup_previous_match()
@@ -340,170 +351,211 @@ func _on_network_match_started(configs: Array[Dictionary], assigned_player_id: i
 		btn_3p.disabled = true
 		btn_4p.disabled = true
 	
-	current_player_count = configs.size()
+	current_player_count = network_manager.pending_player_count
 	_update_player_count_buttons()
 	
 	is_multiplayer_client = true
-	local_player_id = assigned_player_id
+	local_player_id = network_manager.pending_assigned_id
 	
-	# In client mode, instantiate mirrored dummy engine
+	# Mirrored engine for client to track local turns and state
 	engine = GameEngine.new()
-	engine.setup_game(configs, 12345)
+	for config in network_manager.pending_multiplayer_configs:
+		var p := PlayerState.new(
+			int(config.get("id", 0)),
+			str(config.get("name", "Player")),
+			bool(config.get("is_bot", false))
+		)
+		engine.state.players.append(p)
 	
-	show_announcement("Multiplayer match started! You are Player %d." % [local_player_id], 2.5)
+	show_announcement("Connected as Player %d. Synchronizing with Host..." % [local_player_id], 3.0)
+	network_manager.notify_client_scene_ready()
+
+func _on_network_match_started(configs: Array[Dictionary], assigned_player_id: int) -> void:
+	network_manager.pending_multiplayer_configs = configs
+	network_manager.pending_assigned_id = assigned_player_id
+	network_manager.pending_player_count = configs.size()
+	_setup_client_session()
+
+func _on_player_ready_changed(player_id: int, is_ready: bool) -> void:
+	if player_id != local_player_id and swap_overlay != null:
+		var p := engine.state.get_player_by_id(player_id) if engine != null else null
+		var p_name: String = p.name if p != null else ("Player %d" % player_id)
+		swap_overlay.set_player_status(p_name, is_ready)
 
 func _connect_client_network_signals() -> void:
-	network_manager.net_cards_dealt.connect(func(players_data: Array, draw_count: int) -> void:
-		if not is_multiplayer_client:
-			return
-		engine.state.deck.cards.clear()
-		for _i in range(draw_count):
-			engine.state.deck.cards.append(CardData.new(-1))
-		
-		engine.state.players.clear()
-		for p_dict in players_data:
-			engine.state.players.append(PlayerState.from_dict(p_dict))
-		
-		_on_cards_dealt()
-	)
+	if network_manager == null:
+		return
 	
-	network_manager.net_swap_phase_started.connect(func(duration: float) -> void:
-		if not is_multiplayer_client:
-			return
-		engine.state.phase = GameState.GamePhase.SWAP_PHASE
-		_on_swap_phase_started(duration)
-	)
+	if not network_manager.net_cards_dealt.is_connected(_on_net_cards_dealt):
+		network_manager.net_cards_dealt.connect(_on_net_cards_dealt)
+	if not network_manager.net_swap_phase_started.is_connected(_on_net_swap_phase_started):
+		network_manager.net_swap_phase_started.connect(_on_net_swap_phase_started)
+	if not network_manager.net_swap_time_updated.is_connected(_on_net_swap_time_updated):
+		network_manager.net_swap_time_updated.connect(_on_net_swap_time_updated)
+	if not network_manager.net_swap_phase_ended.is_connected(_on_net_swap_phase_ended):
+		network_manager.net_swap_phase_ended.connect(_on_net_swap_phase_ended)
+	if not network_manager.net_player_ready_changed.is_connected(_on_net_player_ready_changed):
+		network_manager.net_player_ready_changed.connect(_on_net_player_ready_changed)
+	if not network_manager.net_card_swapped.is_connected(_on_net_card_swapped):
+		network_manager.net_card_swapped.connect(_on_net_card_swapped)
+	if not network_manager.net_turn_started.is_connected(_on_net_turn_started):
+		network_manager.net_turn_started.connect(_on_net_turn_started)
+	if not network_manager.net_cards_played.is_connected(_on_net_cards_played):
+		network_manager.net_cards_played.connect(_on_net_cards_played)
+	if not network_manager.net_blind_card_revealed.is_connected(_on_net_blind_card_revealed):
+		network_manager.net_blind_card_revealed.connect(_on_net_blind_card_revealed)
+	if not network_manager.net_pile_burned.is_connected(_on_net_pile_burned):
+		network_manager.net_pile_burned.connect(_on_net_pile_burned)
+	if not network_manager.net_pile_collected.is_connected(_on_net_pile_collected):
+		network_manager.net_pile_collected.connect(_on_net_pile_collected)
+	if not network_manager.net_cards_drawn.is_connected(_on_net_cards_drawn):
+		network_manager.net_cards_drawn.connect(_on_net_cards_drawn)
+	if not network_manager.net_game_won.is_connected(_on_net_game_won):
+		network_manager.net_game_won.connect(_on_net_game_won)
+
+func _on_net_cards_dealt(players_data: Array, draw_count: int) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	engine.state.deck.cards.clear()
+	for _i in range(draw_count):
+		engine.state.deck.cards.append(CardData.new(-1))
 	
-	network_manager.net_swap_time_updated.connect(func(seconds: float) -> void:
-		if not is_multiplayer_client:
-			return
-		_on_swap_time_updated(seconds)
-	)
+	engine.state.players.clear()
+	for p_dict in players_data:
+		engine.state.players.append(PlayerState.from_dict(p_dict))
 	
-	network_manager.net_swap_phase_ended.connect(func() -> void:
-		if not is_multiplayer_client:
-			return
-		engine.state.phase = GameState.GamePhase.PLAYING
-		_on_swap_phase_ended()
-	)
-	
-	network_manager.net_card_swapped.connect(func(p_id: int, h_idx: int, t_idx: int) -> void:
-		if not is_multiplayer_client:
-			return
-		var p := engine.state.get_player_by_id(p_id)
-		if p != null and p.id == local_player_id:
-			p.swap_a_and_b(h_idx, t_idx)
-		_on_card_swapped(p_id, h_idx, t_idx)
-	)
-	
-	network_manager.net_turn_started.connect(func(active_p_id: int, active_group: String) -> void:
-		if not is_multiplayer_client:
-			return
-		for idx in range(engine.state.players.size()):
-			if engine.state.players[idx].id == active_p_id:
-				engine.state.current_player_index = idx
-				break
-		_on_turn_started(active_p_id, active_group)
-	)
-	
-	network_manager.net_cards_played.connect(func(p_id: int, cards: Array[CardData], active_group: String) -> void:
-		if not is_multiplayer_client:
-			return
+	_on_cards_dealt()
+
+func _on_net_swap_phase_started(duration: float) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	engine.state.phase = GameState.GamePhase.SWAP_PHASE
+	_on_swap_phase_started(duration)
+
+func _on_net_swap_time_updated(seconds: float) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	_on_swap_time_updated(seconds)
+
+func _on_net_swap_phase_ended() -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	engine.state.phase = GameState.GamePhase.PLAYING
+	_on_swap_phase_ended()
+
+func _on_net_player_ready_changed(p_id: int, is_ready: bool) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	_on_player_ready_changed(p_id, is_ready)
+
+func _on_net_card_swapped(p_id: int, h_idx: int, t_idx: int) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	var p := engine.state.get_player_by_id(p_id)
+	if p != null and p.id == local_player_id:
+		p.swap_a_and_b(h_idx, t_idx)
+	_on_card_swapped(p_id, h_idx, t_idx)
+
+func _on_net_turn_started(active_p_id: int, active_group: String) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	for idx in range(engine.state.players.size()):
+		if engine.state.players[idx].id == active_p_id:
+			engine.state.current_player_index = idx
+			break
+	_on_turn_started(active_p_id, active_group)
+
+func _on_net_cards_played(p_id: int, cards: Array[CardData], active_group: String) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	for c in cards:
+		engine.state.ground_stack.append(c)
+	var p := engine.state.get_player_by_id(p_id)
+	if p != null and p.id == local_player_id:
+		var ranks_to_remove: Array[CardData.Rank] = []
 		for c in cards:
-			engine.state.ground_stack.append(c)
-		var p := engine.state.get_player_by_id(p_id)
-		if p != null and p.id == local_player_id:
-			var ranks_to_remove: Array[CardData.Rank] = []
-			for c in cards:
-				ranks_to_remove.append(c.rank)
-			for r in ranks_to_remove:
-				if active_group == "A":
-					for i in range(p.group_a.size() - 1, -1, -1):
-						if p.group_a[i].rank == r:
-							p.group_a.remove_at(i)
-							break
-				elif active_group == "B":
-					for i in range(p.group_b.size() - 1, -1, -1):
-						if p.group_b[i].rank == r:
-							p.group_b.remove_at(i)
-							break
-				elif active_group == "C":
-					if not p.group_c.is_empty():
-						p.group_c.pop_back()
-		elif p != null:
-			for _c in cards:
-				if active_group == "A" and not p.group_a.is_empty():
-					p.group_a.pop_back()
-				elif active_group == "B" and not p.group_b.is_empty():
-					p.group_b.pop_back()
-				elif active_group == "C" and not p.group_c.is_empty():
+			ranks_to_remove.append(c.rank)
+		for r in ranks_to_remove:
+			if active_group == "A":
+				for i in range(p.group_a.size() - 1, -1, -1):
+					if p.group_a[i].rank == r:
+						p.group_a.remove_at(i)
+						break
+			elif active_group == "B":
+				for i in range(p.group_b.size() - 1, -1, -1):
+					if p.group_b[i].rank == r:
+						p.group_b.remove_at(i)
+						break
+			elif active_group == "C":
+				if not p.group_c.is_empty():
 					p.group_c.pop_back()
-				elif not p.group_a.is_empty():
-					p.group_a.pop_back()
-				elif not p.group_b.is_empty():
-					p.group_b.pop_back()
-				elif not p.group_c.is_empty():
-					p.group_c.pop_back()
-		
-		_on_cards_played(p_id, cards, active_group)
-	)
-	
-	network_manager.net_blind_card_revealed.connect(func(p_id: int, card: CardData, is_valid: bool) -> void:
-		if not is_multiplayer_client:
-			return
-		if not is_valid:
-			# Failed blind card flip was popped on host; mirror pop on client
-			var p := engine.state.get_player_by_id(p_id)
-			if p != null and not p.group_c.is_empty():
+	elif p != null:
+		for _c in cards:
+			if active_group == "A" and not p.group_a.is_empty():
+				p.group_a.pop_back()
+			elif active_group == "B" and not p.group_b.is_empty():
+				p.group_b.pop_back()
+			elif active_group == "C" and not p.group_c.is_empty():
 				p.group_c.pop_back()
-		_on_blind_card_revealed(p_id, card, is_valid)
-	)
+			elif not p.group_a.is_empty():
+				p.group_a.pop_back()
+			elif not p.group_b.is_empty():
+				p.group_b.pop_back()
+			elif not p.group_c.is_empty():
+				p.group_c.pop_back()
 	
-	network_manager.net_pile_burned.connect(func(p_id: int, reason: String) -> void:
-		if not is_multiplayer_client:
-			return
+	_on_cards_played(p_id, cards, active_group)
+
+func _on_net_blind_card_revealed(p_id: int, card: CardData, is_valid: bool) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	if not is_valid:
+		var p := engine.state.get_player_by_id(p_id)
+		if p != null and not p.group_c.is_empty():
+			p.group_c.pop_back()
+	_on_blind_card_revealed(p_id, card, is_valid)
+
+func _on_net_pile_burned(p_id: int, reason: String) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	for c in engine.state.ground_stack:
+		engine.state.graveyard.append(c)
+	engine.state.ground_stack.clear()
+	_on_pile_burned(p_id, reason)
+
+func _on_net_pile_collected(p_id: int, count: int) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	var p := engine.state.get_player_by_id(p_id)
+	if p != null:
 		for c in engine.state.ground_stack:
-			engine.state.graveyard.append(c)
-		engine.state.ground_stack.clear()
-		_on_pile_burned(p_id, reason)
-	)
-	
-	network_manager.net_pile_collected.connect(func(p_id: int, count: int) -> void:
-		if not is_multiplayer_client:
-			return
-		var p := engine.state.get_player_by_id(p_id)
-		if p != null:
-			for c in engine.state.ground_stack:
+			p.group_a.append(c)
+		if p.id == local_player_id:
+			p.sort_hand()
+	engine.state.ground_stack.clear()
+	_on_pile_collected(p_id, count)
+
+func _on_net_cards_drawn(p_id: int, count: int, drawn_cards: Array[CardData]) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	var p := engine.state.get_player_by_id(p_id)
+	if p != null:
+		if p.id == local_player_id and not drawn_cards.is_empty():
+			for c in drawn_cards:
 				p.group_a.append(c)
-			if p.id == local_player_id:
-				p.sort_hand()
-		engine.state.ground_stack.clear()
-		_on_pile_collected(p_id, count)
-	)
-	
-	network_manager.net_cards_drawn.connect(func(p_id: int, count: int, drawn_cards: Array[CardData]) -> void:
-		if not is_multiplayer_client:
-			return
-		var p := engine.state.get_player_by_id(p_id)
-		if p != null:
-			if p.id == local_player_id and not drawn_cards.is_empty():
-				for c in drawn_cards:
-					p.group_a.append(c)
-				p.sort_hand()
-			else:
-				for _i in range(count):
-					p.group_a.append(CardData.new(-1))
-		for _i in range(count):
-			if not engine.state.deck.is_empty():
-				engine.state.deck.cards.pop_back()
-		_on_cards_drawn(p_id, count, drawn_cards)
-	)
-	
-	network_manager.net_game_won.connect(func(winner_id: int) -> void:
-		if not is_multiplayer_client:
-			return
-		_on_game_won(winner_id)
-	)
+			p.sort_hand()
+		else:
+			for _i in range(count):
+				p.group_a.append(CardData.new(-1))
+	for _i in range(count):
+		if not engine.state.deck.is_empty():
+			engine.state.deck.cards.pop_back()
+	_on_cards_drawn(p_id, count, drawn_cards)
+
+func _on_net_game_won(winner_id: int) -> void:
+	if not is_multiplayer_client or engine == null:
+		return
+	_on_game_won(winner_id)
 
 # ==========================================
 # SIGNAL HANDLERS

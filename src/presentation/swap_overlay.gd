@@ -24,8 +24,15 @@ func update_time(seconds: float) -> void:
 		timer_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
 
 func set_bot_status(bot_name: String, bot_ready: bool) -> void:
-	if bot_ready:
-		status_label.text = "%s is Ready!" % [bot_name]
+	set_player_status(bot_name, bot_ready)
+
+func set_player_status(player_name: String, player_ready: bool) -> void:
+	if player_ready:
+		status_label.text = "✓ %s is Ready!" % [player_name]
+		status_label.add_theme_color_override("font_color", Color(0.4, 0.9, 0.4))
+	else:
+		status_label.text = "⏳ %s is swapping cards..." % [player_name]
+		status_label.add_theme_color_override("font_color", Color(0.8, 0.85, 0.95))
 
 func _on_ready_pressed() -> void:
 	is_ready = not is_ready

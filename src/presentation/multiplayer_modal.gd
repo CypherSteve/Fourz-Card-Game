@@ -167,10 +167,7 @@ func _on_start_hosting_pressed() -> void:
 func _on_start_match_pressed() -> void:
 	var net: NetworkManager = get_node_or_null("/root/GameNetwork")
 	if net != null and net.is_server():
-		var engine := GameEngine.new()
-		net.start_multiplayer_match(engine)
-		if get_tree().current_scene == null or get_tree().current_scene.name != "TableView":
-			get_tree().change_scene_to_file("res://src/presentation/table_view.tscn")
+		net.host_initiate_match_start()
 	
 	start_game_requested.emit()
 	close()

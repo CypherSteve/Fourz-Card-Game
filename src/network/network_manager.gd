@@ -23,6 +23,7 @@ signal net_blind_card_revealed(player_id: int, card: CardData, is_valid: bool)
 signal net_pile_burned(player_id: int, reason: String)
 signal net_pile_collected(player_id: int, count: int)
 signal net_cards_drawn(player_id: int, count: int, drawn_cards: Array[CardData])
+signal net_player_ready_changed(player_id: int, is_ready: bool)
 signal net_game_won(winner_id: int)
 
 const DEFAULT_PORT: int = 7777
@@ -30,6 +31,7 @@ const MAX_PLAYERS: int = 4
 
 var peer: ENetMultiplayerPeer
 var is_network_active: bool = false
+var is_hosting: bool = false
 var local_name: String = "Player"
 var room_player_count: int = 2
 var fill_with_bots: bool = true
@@ -47,6 +49,8 @@ var pending_game_mode: String = "SOLO" # "SOLO" or "MULTIPLAYER"
 var pending_player_count: int = 2
 var pending_multiplayer_configs: Array[Dictionary] = []
 var pending_assigned_id: int = 0
+var peers_ready_in_table_view: Array[int] = []
+var match_started: bool = false
 
 func _ready() -> void:
 	multiplayer.peer_connected.connect(_on_peer_connected)
@@ -69,8 +73,10 @@ func host_game(port: int = DEFAULT_PORT, target_player_count: int = 2, p_name: S
 		print("Failed to host server on port %d: %s" % [port, error_string(err)])
 		return err
 	
-	multiplayer.multiplayer_peer = peer
+	if multiplayer:
+		multiplayer.multiplayer_peer = peer
 	is_network_active = true
+	is_hosting = true
 	local_player_id = 0
 	
 	lobby_peers.clear()
@@ -96,8 +102,10 @@ func join_game(address: String = "127.0.0.1", port: int = DEFAULT_PORT, p_name: 
 		print("Failed to connect to %s:%d: %s" % [address, port, error_string(err)])
 		return err
 	
-	multiplayer.multiplayer_peer = peer
+	if multiplayer:
+		multiplayer.multiplayer_peer = peer
 	is_network_active = true
+	is_hosting = false
 	return OK
 
 ## Disconnects from current network session.
@@ -105,18 +113,28 @@ func disconnect_game() -> void:
 	if multiplayer and multiplayer.has_multiplayer_peer():
 		multiplayer.multiplayer_peer.close()
 		multiplayer.multiplayer_peer = null
+	elif peer != null:
+		peer.close()
+		peer = null
 	
 	is_network_active = false
+	is_hosting = false
 	lobby_peers.clear()
 	peer_to_player_id.clear()
 	player_id_to_peer.clear()
+	peers_ready_in_table_view.clear()
+	match_started = false
 	engine = null
 	pending_game_mode = "SOLO"
 	pending_multiplayer_configs.clear()
 	pending_assigned_id = 0
 
 func is_server() -> bool:
-	return multiplayer.is_server() if is_network_active else false
+	if not is_network_active:
+		return false
+	if multiplayer and multiplayer.has_multiplayer_peer():
+		return multiplayer.is_server()
+	return is_hosting
 
 # ==========================================
 # LOBBY & PEER HANDLING
@@ -189,15 +207,16 @@ func rpc_sync_lobby(peers: Array) -> void:
 	lobby_updated.emit(lobby_peers)
 
 # ==========================================
-# MATCH SETUP (HOST)
+# MATCH SETUP & SCENE LOADING SYNCHRONIZATION
 # ==========================================
 
-## Starts the multiplayer match from the lobby (Host only).
-func start_multiplayer_match(p_engine: GameEngine) -> void:
+## Called by host from lobby/modal when "START MATCH" is clicked
+func host_initiate_match_start() -> void:
 	if not is_server():
 		return
 	
-	engine = p_engine
+	peers_ready_in_table_view.clear()
+	match_started = false
 	peer_to_player_id.clear()
 	player_id_to_peer.clear()
 	
@@ -225,30 +244,22 @@ func start_multiplayer_match(p_engine: GameEngine) -> void:
 				"peer_id": -1
 			})
 	
-	var match_seed := randi()
-	
-	# Wire host engine signals to RPC broadcasts
-	_bind_engine_signals()
-	
 	pending_game_mode = "MULTIPLAYER"
 	pending_player_count = configs.size()
 	pending_multiplayer_configs = configs
 	pending_assigned_id = 0
 	
-	# Broadcast start match ONLY to remote clients (peer_id != 1)
+	# Instruct all remote clients to load TableView scene
 	for p_info in lobby_peers:
 		if p_info.peer_id != 1:
 			var client_p_id: int = peer_to_player_id.get(p_info.peer_id, 1)
-			rpc_id(p_info.peer_id, "rpc_match_started", configs, client_p_id)
+			rpc_id(p_info.peer_id, "rpc_prepare_client_for_match", configs, client_p_id)
 	
-	# Signal to host locally
-	match_started_network.emit(configs, 0)
-	
-	# Start engine on host
-	engine.setup_game(configs, match_seed)
+	# Transition host to TableView
+	get_tree().change_scene_to_file("res://src/presentation/table_view.tscn")
 
-@rpc("call_local", "reliable")
-func rpc_match_started(configs: Array, assigned_player_id: int) -> void:
+@rpc("reliable")
+func rpc_prepare_client_for_match(configs: Array, assigned_player_id: int) -> void:
 	local_player_id = assigned_player_id
 	var typed_configs: Array[Dictionary] = []
 	for c in configs:
@@ -259,7 +270,52 @@ func rpc_match_started(configs: Array, assigned_player_id: int) -> void:
 	pending_multiplayer_configs = typed_configs
 	pending_assigned_id = assigned_player_id
 	
-	match_started_network.emit(typed_configs, local_player_id)
+	# Transition client to TableView
+	get_tree().change_scene_to_file("res://src/presentation/table_view.tscn")
+
+## Called by Client when TableView._ready() has finished loading
+func notify_client_scene_ready() -> void:
+	if not is_server():
+		rpc_id(1, "rpc_client_scene_ready")
+
+@rpc("any_peer", "reliable")
+func rpc_client_scene_ready() -> void:
+	if not is_server():
+		return
+	var sender := multiplayer.get_remote_sender_id()
+	if not peers_ready_in_table_view.has(sender):
+		peers_ready_in_table_view.append(sender)
+	_check_all_peers_ready_to_deal()
+
+## Called by Host when TableView._ready() has finished loading
+func host_scene_ready_and_check() -> void:
+	if not is_server():
+		return
+	if not peers_ready_in_table_view.has(1):
+		peers_ready_in_table_view.append(1)
+	_check_all_peers_ready_to_deal()
+
+func _check_all_peers_ready_to_deal() -> void:
+	if not is_server() or engine == null or match_started:
+		return
+	
+	# Check if all human connected peers in lobby have arrived in TableView
+	for p_info in lobby_peers:
+		if not peers_ready_in_table_view.has(p_info.peer_id):
+			return # Still waiting for a peer to finish scene load
+	
+	# All human peers are loaded into TableView and listening! Safely deal cards now
+	match_started = true
+	_bind_engine_signals()
+	var match_seed := randi()
+	engine.setup_game(pending_multiplayer_configs, match_seed)
+
+## Starts the multiplayer match from the lobby (Host only).
+func start_multiplayer_match(p_engine: GameEngine) -> void:
+	if not is_server():
+		return
+	engine = p_engine
+	host_initiate_match_start()
 
 func _bind_engine_signals() -> void:
 	if engine == null:
@@ -267,41 +323,57 @@ func _bind_engine_signals() -> void:
 	
 	engine.cards_dealt.connect(_on_host_cards_dealt)
 	engine.swap_phase_started.connect(func(duration: float) -> void:
-		rpc("rpc_sync_swap_phase_started", duration)
+		if is_inside_tree():
+			rpc("rpc_sync_swap_phase_started", duration)
 	)
 	engine.swap_time_updated.connect(func(seconds: float) -> void:
-		rpc("rpc_sync_swap_time_updated", seconds)
+		if is_inside_tree():
+			rpc("rpc_sync_swap_time_updated", seconds)
 	)
 	engine.swap_phase_ended.connect(func() -> void:
-		rpc("rpc_sync_swap_phase_ended")
+		if is_inside_tree():
+			rpc("rpc_sync_swap_phase_ended")
 	)
 	engine.card_swapped.connect(func(p_id: int, h_idx: int, t_idx: int) -> void:
-		rpc("rpc_sync_card_swapped", p_id, h_idx, t_idx)
+		if is_inside_tree():
+			rpc("rpc_sync_card_swapped", p_id, h_idx, t_idx)
+	)
+	engine.player_ready_changed.connect(func(p_id: int, is_ready: bool) -> void:
+		if is_inside_tree():
+			rpc("rpc_sync_player_ready_changed", p_id, is_ready)
 	)
 	engine.turn_started.connect(func(p_id: int, group: String) -> void:
-		rpc("rpc_sync_turn_started", p_id, group)
+		if is_inside_tree():
+			rpc("rpc_sync_turn_started", p_id, group)
 	)
 	engine.cards_played.connect(func(p_id: int, cards: Array[CardData], group: String) -> void:
-		var cards_data: Array[Dictionary] = []
-		for c in cards:
-			cards_data.append(c.to_dict())
-		rpc("rpc_sync_cards_played", p_id, cards_data, group)
+		if is_inside_tree():
+			var cards_data: Array[Dictionary] = []
+			for c in cards:
+				cards_data.append(c.to_dict())
+			rpc("rpc_sync_cards_played", p_id, cards_data, group)
 	)
 	engine.blind_card_revealed.connect(func(p_id: int, card: CardData, is_valid: bool) -> void:
-		rpc("rpc_sync_blind_card_revealed", p_id, card.to_dict(), is_valid)
+		if is_inside_tree():
+			rpc("rpc_sync_blind_card_revealed", p_id, card.to_dict(), is_valid)
 	)
 	engine.pile_burned.connect(func(p_id: int, reason: String) -> void:
-		rpc("rpc_sync_pile_burned", p_id, reason)
+		if is_inside_tree():
+			rpc("rpc_sync_pile_burned", p_id, reason)
 	)
 	engine.pile_collected.connect(func(p_id: int, count: int) -> void:
-		rpc("rpc_sync_pile_collected", p_id, count)
+		if is_inside_tree():
+			rpc("rpc_sync_pile_collected", p_id, count)
 	)
 	engine.cards_drawn.connect(_on_host_cards_drawn)
 	engine.game_won.connect(func(winner_id: int) -> void:
-		rpc("rpc_sync_game_won", winner_id)
+		if is_inside_tree():
+			rpc("rpc_sync_game_won", winner_id)
 	)
 
 func _on_host_cards_dealt() -> void:
+	if not is_inside_tree():
+		return
 	# Broadcast customized card data to each remote peer (concealing private hands)
 	for peer_info in lobby_peers:
 		var p_peer_id: int = peer_info.peer_id
@@ -317,6 +389,8 @@ func _on_host_cards_dealt() -> void:
 		rpc_id(p_peer_id, "rpc_sync_cards_dealt", players_data, engine.state.deck.count())
 
 func _on_host_cards_drawn(player_id: int, count: int, drawn_cards: Array[CardData] = []) -> void:
+	if not is_inside_tree():
+		return
 	var target_peer: int = player_id_to_peer.get(player_id, -1)
 	
 	# Send exact drawn cards to owner, and empty array to other players to preserve private hands
@@ -449,6 +523,10 @@ func rpc_sync_swap_phase_ended() -> void:
 @rpc("reliable")
 func rpc_sync_card_swapped(p_id: int, h_idx: int, t_idx: int) -> void:
 	net_card_swapped.emit(p_id, h_idx, t_idx)
+
+@rpc("reliable")
+func rpc_sync_player_ready_changed(p_id: int, is_ready: bool) -> void:
+	net_player_ready_changed.emit(p_id, is_ready)
 
 @rpc("reliable")
 func rpc_sync_turn_started(active_p_id: int, active_group: String) -> void:
