@@ -16,6 +16,7 @@ const SwapOverlay = preload("res://src/presentation/swap_overlay.gd")
 @onready var pickup_button: Button = $ActionBar/PickupButton
 @onready var restart_button: Button = $HeaderBar/RestartButton
 @onready var mute_button: Button = $HeaderBar/MuteButton
+@onready var menu_button: Button = $HeaderBar/MenuButton
 @onready var btn_2p: Button = $HeaderBar/PlayerCountBox/Btn2P
 @onready var btn_3p: Button = $HeaderBar/PlayerCountBox/Btn3P
 @onready var btn_4p: Button = $HeaderBar/PlayerCountBox/Btn4P
@@ -89,12 +90,17 @@ func _ready() -> void:
 	audio_manager.name = "AudioManager"
 	add_child(audio_manager)
 	
-	# Instantiate NetworkManager with explicit node name for RPC consistency across all peers
-	network_manager = NetworkManager.new()
-	network_manager.name = "NetworkManager"
-	add_child(network_manager)
+	# Use autoload GameNetwork if present, or instantiate locally as fallback
+	network_manager = get_node_or_null("/root/GameNetwork")
+	if network_manager == null:
+		network_manager = NetworkManager.new()
+		network_manager.name = "NetworkManager"
+		add_child(network_manager)
 	
 	_connect_client_network_signals()
+	
+	if menu_button:
+		menu_button.pressed.connect(_on_menu_pressed)
 	
 	if multiplayer_btn:
 		multiplayer_btn.pressed.connect(func() -> void:
@@ -122,8 +128,11 @@ func _ready() -> void:
 		multiplayer_modal.on_connection_failed("Failed to connect to host.")
 	)
 	network_manager.server_disconnected.connect(func() -> void:
-		show_announcement("Server disconnected. Returning to Solo mode.", 3.0)
-		start_new_match()
+		show_announcement("Host disconnected. Returning to Main Menu...", 3.0)
+		get_tree().create_timer(2.0).timeout.connect(func() -> void:
+			if is_inside_tree():
+				get_tree().change_scene_to_file("res://src/presentation/main_menu.tscn")
+		)
 	)
 	network_manager.match_started_network.connect(_on_network_match_started)
 	
@@ -142,7 +151,10 @@ func _ready() -> void:
 	swap_overlay.ready_toggled.connect(_on_swap_ready_toggled)
 	game_over_modal.play_again_requested.connect(func() -> void:
 		audio_manager.play_click()
-		start_new_match()
+		if is_multiplayer_client or (network_manager != null and network_manager.is_network_active):
+			_on_menu_pressed()
+		else:
+			start_new_match()
 	)
 	
 	_update_player_count_buttons()
@@ -157,11 +169,27 @@ func _ready() -> void:
 		badge_style.content_margin_bottom = 2
 		player_turn_badge.add_theme_stylebox_override("panel", badge_style)
 	
-	start_new_match()
+	if network_manager != null and network_manager.pending_game_mode == "MULTIPLAYER":
+		if network_manager.is_server():
+			_setup_host_session()
+		else:
+			_on_network_match_started(network_manager.pending_multiplayer_configs, network_manager.pending_assigned_id)
+	else:
+		if network_manager != null:
+			current_player_count = network_manager.pending_player_count
+			_update_player_count_buttons()
+		start_new_match()
 
 func _process(delta: float) -> void:
 	if engine != null and engine.state.phase == GameState.GamePhase.SWAP_PHASE:
-		engine.tick_swap_timer(delta)
+		if not is_multiplayer_client:
+			engine.tick_swap_timer(delta)
+
+func _on_menu_pressed() -> void:
+	audio_manager.play_click()
+	if network_manager != null and network_manager.is_network_active:
+		network_manager.disconnect_game()
+	get_tree().change_scene_to_file("res://src/presentation/main_menu.tscn")
 
 func _set_player_count(count: int) -> void:
 	audio_manager.play_click()
@@ -265,14 +293,25 @@ func _on_join_match_requested(address: String, port: int, player_name: String) -
 	if err != OK:
 		multiplayer_modal.on_connection_failed(error_string(err))
 
-func _on_multiplayer_start_game_requested() -> void:
+func _setup_host_session() -> void:
 	_cleanup_previous_match()
 	is_multiplayer_client = false
 	local_player_id = 0
 	
-	engine = GameEngine.new()
-	_connect_engine_signals()
-	network_manager.start_multiplayer_match(engine)
+	if restart_button:
+		restart_button.visible = false
+	if btn_2p and btn_3p and btn_4p:
+		btn_2p.disabled = true
+		btn_3p.disabled = true
+		btn_4p.disabled = true
+	
+	engine = network_manager.engine
+	if engine == null:
+		engine = GameEngine.new()
+		_connect_engine_signals()
+		network_manager.start_multiplayer_match(engine)
+	else:
+		_connect_engine_signals()
 	
 	current_player_count = engine.state.players.size()
 	_update_player_count_buttons()
@@ -281,10 +320,25 @@ func _on_multiplayer_start_game_requested() -> void:
 		if p.is_bot:
 			var bot := BotController.new(p.id, engine, 100 + p.id)
 			bot_controllers[p.id] = bot
+	
+	render_all_cards()
+	update_pile_counts()
+	show_announcement("Multiplayer room active! You are Host (Player 0).", 2.5)
+
+func _on_multiplayer_start_game_requested() -> void:
+	_setup_host_session()
 
 func _on_network_match_started(configs: Array[Dictionary], assigned_player_id: int) -> void:
-	multiplayer_modal.close()
+	if multiplayer_modal:
+		multiplayer_modal.close()
 	_cleanup_previous_match()
+	
+	if restart_button:
+		restart_button.visible = false
+	if btn_2p and btn_3p and btn_4p:
+		btn_2p.disabled = true
+		btn_3p.disabled = true
+		btn_4p.disabled = true
 	
 	current_player_count = configs.size()
 	_update_player_count_buttons()
@@ -300,6 +354,8 @@ func _on_network_match_started(configs: Array[Dictionary], assigned_player_id: i
 
 func _connect_client_network_signals() -> void:
 	network_manager.net_cards_dealt.connect(func(players_data: Array, draw_count: int) -> void:
+		if not is_multiplayer_client:
+			return
 		engine.state.deck.cards.clear()
 		for _i in range(draw_count):
 			engine.state.deck.cards.append(CardData.new(-1))
@@ -312,18 +368,28 @@ func _connect_client_network_signals() -> void:
 	)
 	
 	network_manager.net_swap_phase_started.connect(func(duration: float) -> void:
+		if not is_multiplayer_client:
+			return
 		engine.state.phase = GameState.GamePhase.SWAP_PHASE
 		_on_swap_phase_started(duration)
 	)
 	
-	network_manager.net_swap_time_updated.connect(_on_swap_time_updated)
+	network_manager.net_swap_time_updated.connect(func(seconds: float) -> void:
+		if not is_multiplayer_client:
+			return
+		_on_swap_time_updated(seconds)
+	)
 	
 	network_manager.net_swap_phase_ended.connect(func() -> void:
+		if not is_multiplayer_client:
+			return
 		engine.state.phase = GameState.GamePhase.PLAYING
 		_on_swap_phase_ended()
 	)
 	
 	network_manager.net_card_swapped.connect(func(p_id: int, h_idx: int, t_idx: int) -> void:
+		if not is_multiplayer_client:
+			return
 		var p := engine.state.get_player_by_id(p_id)
 		if p != null and p.id == local_player_id:
 			p.swap_a_and_b(h_idx, t_idx)
@@ -331,6 +397,8 @@ func _connect_client_network_signals() -> void:
 	)
 	
 	network_manager.net_turn_started.connect(func(active_p_id: int, active_group: String) -> void:
+		if not is_multiplayer_client:
+			return
 		for idx in range(engine.state.players.size()):
 			if engine.state.players[idx].id == active_p_id:
 				engine.state.current_player_index = idx
@@ -339,6 +407,8 @@ func _connect_client_network_signals() -> void:
 	)
 	
 	network_manager.net_cards_played.connect(func(p_id: int, cards: Array[CardData], active_group: String) -> void:
+		if not is_multiplayer_client:
+			return
 		for c in cards:
 			engine.state.ground_stack.append(c)
 		var p := engine.state.get_player_by_id(p_id)
@@ -379,6 +449,8 @@ func _connect_client_network_signals() -> void:
 	)
 	
 	network_manager.net_blind_card_revealed.connect(func(p_id: int, card: CardData, is_valid: bool) -> void:
+		if not is_multiplayer_client:
+			return
 		if not is_valid:
 			# Failed blind card flip was popped on host; mirror pop on client
 			var p := engine.state.get_player_by_id(p_id)
@@ -388,6 +460,8 @@ func _connect_client_network_signals() -> void:
 	)
 	
 	network_manager.net_pile_burned.connect(func(p_id: int, reason: String) -> void:
+		if not is_multiplayer_client:
+			return
 		for c in engine.state.ground_stack:
 			engine.state.graveyard.append(c)
 		engine.state.ground_stack.clear()
@@ -395,6 +469,8 @@ func _connect_client_network_signals() -> void:
 	)
 	
 	network_manager.net_pile_collected.connect(func(p_id: int, count: int) -> void:
+		if not is_multiplayer_client:
+			return
 		var p := engine.state.get_player_by_id(p_id)
 		if p != null:
 			for c in engine.state.ground_stack:
@@ -406,6 +482,8 @@ func _connect_client_network_signals() -> void:
 	)
 	
 	network_manager.net_cards_drawn.connect(func(p_id: int, count: int, drawn_cards: Array[CardData]) -> void:
+		if not is_multiplayer_client:
+			return
 		var p := engine.state.get_player_by_id(p_id)
 		if p != null:
 			if p.id == local_player_id and not drawn_cards.is_empty():
@@ -421,7 +499,11 @@ func _connect_client_network_signals() -> void:
 		_on_cards_drawn(p_id, count, drawn_cards)
 	)
 	
-	network_manager.net_game_won.connect(_on_game_won)
+	network_manager.net_game_won.connect(func(winner_id: int) -> void:
+		if not is_multiplayer_client:
+			return
+		_on_game_won(winner_id)
+	)
 
 # ==========================================
 # SIGNAL HANDLERS

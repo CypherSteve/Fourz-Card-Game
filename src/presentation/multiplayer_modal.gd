@@ -46,6 +46,31 @@ func _ready() -> void:
 	_apply_styles()
 	_setup_signals()
 	_update_host_count_buttons()
+	_connect_network()
+
+func _connect_network() -> void:
+	var net: NetworkManager = get_node_or_null("/root/GameNetwork")
+	if net == null:
+		return
+	
+	net.host_started.connect(func(port: int) -> void:
+		var lan_ip := get_lan_ip()
+		lan_ip_label.text = "📍 Local IP: 127.0.0.1  |  LAN IP: %s (Port: %d)" % [lan_ip, port]
+	)
+	net.lobby_updated.connect(func(peers: Array[Dictionary]) -> void:
+		update_lobby_peers(peers)
+	)
+	net.connection_succeeded.connect(func() -> void:
+		on_connection_success()
+	)
+	net.connection_failed.connect(func() -> void:
+		on_connection_failed("Failed to connect to host.")
+	)
+	net.match_started_network.connect(func(_configs: Array[Dictionary], _assigned_id: int) -> void:
+		close()
+		if get_tree().current_scene == null or get_tree().current_scene.name != "TableView":
+			get_tree().change_scene_to_file("res://src/presentation/table_view.tscn")
+	)
 
 func _apply_styles() -> void:
 	var panel_style := StyleBoxFlat.new()
@@ -76,6 +101,15 @@ func open() -> void:
 	var tween := create_tween()
 	tween.tween_property(self, "modulate:a", 1.0, 0.2)
 	_switch_tab(true)
+	
+	var net: NetworkManager = get_node_or_null("/root/GameNetwork")
+	if net != null and not net.is_network_active:
+		is_currently_hosting = false
+		start_hosting_btn.visible = true
+		host_info_box.visible = false
+		connect_btn.disabled = false
+		join_status_label.text = "Enter the Host IP and click Connect to join."
+		join_status_label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
 
 func close() -> void:
 	var tween := create_tween()
@@ -122,9 +156,22 @@ func _on_start_hosting_pressed() -> void:
 	var lan_ip := get_lan_ip()
 	lan_ip_label.text = "📍 Local IP: 127.0.0.1  |  LAN IP: %s (Port: %d)" % [lan_ip, port]
 	
+	var net: NetworkManager = get_node_or_null("/root/GameNetwork")
+	if net != null:
+		var err := net.host_game(port, selected_player_count, p_name, fill_bots)
+		if err != OK:
+			lan_ip_label.text = "❌ Failed to host server: %s" % error_string(err)
+	
 	host_match_requested.emit(port, selected_player_count, p_name, fill_bots)
 
 func _on_start_match_pressed() -> void:
+	var net: NetworkManager = get_node_or_null("/root/GameNetwork")
+	if net != null and net.is_server():
+		var engine := GameEngine.new()
+		net.start_multiplayer_match(engine)
+		if get_tree().current_scene == null or get_tree().current_scene.name != "TableView":
+			get_tree().change_scene_to_file("res://src/presentation/table_view.tscn")
+	
 	start_game_requested.emit()
 	close()
 
@@ -144,6 +191,12 @@ func _on_connect_pressed() -> void:
 	join_status_label.text = "Connecting to %s:%d..." % [ip_addr, port]
 	join_status_label.add_theme_color_override("font_color", Color(0.9, 0.85, 0.3))
 	connect_btn.disabled = true
+	
+	var net: NetworkManager = get_node_or_null("/root/GameNetwork")
+	if net != null:
+		var err := net.join_game(ip_addr, port, p_name)
+		if err != OK:
+			on_connection_failed(error_string(err))
 	
 	join_match_requested.emit(ip_addr, port, p_name)
 

@@ -87,6 +87,12 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "🌐 Multiplayer"
 
+[node name="MenuButton" type="Button" parent="HeaderBar"]
+custom_minimum_size = Vector2(80, 28)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "🏠 Menu"
+
 [node name="OpponentsContainer" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15

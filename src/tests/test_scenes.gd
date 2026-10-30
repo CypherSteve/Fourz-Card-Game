@@ -8,6 +8,7 @@ static func run() -> bool:
 	var success: bool = true
 	
 	var scenes_to_test: Array[String] = [
+		"res://src/presentation/main_menu.tscn",
 		"res://src/presentation/table_view.tscn",
 		"res://src/presentation/card_view.tscn",
 		"res://src/presentation/opponent_view.tscn",
@@ -46,6 +47,7 @@ static func run() -> bool:
 		"res://src/ai/bot_controller.gd",
 		"res://src/network/network_manager.gd",
 		"res://src/presentation/audio_manager.gd",
+		"res://src/presentation/main_menu.gd",
 		"res://src/controllers/player_controller.gd"
 	]
 	

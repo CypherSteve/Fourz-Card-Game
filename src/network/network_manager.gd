@@ -42,6 +42,12 @@ var player_id_to_peer: Dictionary = {}
 var engine: GameEngine = null
 var local_player_id: int = 0
 
+# Pending game parameters for scene transitions
+var pending_game_mode: String = "SOLO" # "SOLO" or "MULTIPLAYER"
+var pending_player_count: int = 2
+var pending_multiplayer_configs: Array[Dictionary] = []
+var pending_assigned_id: int = 0
+
 func _ready() -> void:
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
@@ -96,7 +102,7 @@ func join_game(address: String = "127.0.0.1", port: int = DEFAULT_PORT, p_name: 
 
 ## Disconnects from current network session.
 func disconnect_game() -> void:
-	if multiplayer.has_multiplayer_peer():
+	if multiplayer and multiplayer.has_multiplayer_peer():
 		multiplayer.multiplayer_peer.close()
 		multiplayer.multiplayer_peer = null
 	
@@ -105,6 +111,9 @@ func disconnect_game() -> void:
 	peer_to_player_id.clear()
 	player_id_to_peer.clear()
 	engine = null
+	pending_game_mode = "SOLO"
+	pending_multiplayer_configs.clear()
+	pending_assigned_id = 0
 
 func is_server() -> bool:
 	return multiplayer.is_server() if is_network_active else false
@@ -173,9 +182,10 @@ func rpc_receive_player_info(peer_id: int, p_name: String) -> void:
 
 @rpc("call_local", "reliable")
 func rpc_sync_lobby(peers: Array) -> void:
-	lobby_peers.clear()
+	var updated_peers: Array[Dictionary] = []
 	for p in peers:
-		lobby_peers.append(Dictionary(p))
+		updated_peers.append(Dictionary(p))
+	lobby_peers = updated_peers
 	lobby_updated.emit(lobby_peers)
 
 # ==========================================
@@ -220,11 +230,19 @@ func start_multiplayer_match(p_engine: GameEngine) -> void:
 	# Wire host engine signals to RPC broadcasts
 	_bind_engine_signals()
 	
+	pending_game_mode = "MULTIPLAYER"
+	pending_player_count = configs.size()
+	pending_multiplayer_configs = configs
+	pending_assigned_id = 0
+	
 	# Broadcast start match ONLY to remote clients (peer_id != 1)
 	for p_info in lobby_peers:
 		if p_info.peer_id != 1:
 			var client_p_id: int = peer_to_player_id.get(p_info.peer_id, 1)
 			rpc_id(p_info.peer_id, "rpc_match_started", configs, client_p_id)
+	
+	# Signal to host locally
+	match_started_network.emit(configs, 0)
 	
 	# Start engine on host
 	engine.setup_game(configs, match_seed)
@@ -235,6 +253,12 @@ func rpc_match_started(configs: Array, assigned_player_id: int) -> void:
 	var typed_configs: Array[Dictionary] = []
 	for c in configs:
 		typed_configs.append(Dictionary(c))
+	
+	pending_game_mode = "MULTIPLAYER"
+	pending_player_count = typed_configs.size()
+	pending_multiplayer_configs = typed_configs
+	pending_assigned_id = assigned_player_id
+	
 	match_started_network.emit(typed_configs, local_player_id)
 
 func _bind_engine_signals() -> void:
@@ -403,60 +427,60 @@ func rpc_request_blind_flip(index: int) -> void:
 		engine.play_blind_card(p_id, index)
 
 # ==========================================
-# CLIENT INCOMING SYNC RPCS
+# CLIENT INCOMING SYNC RPCS (Sent from host to remote clients)
 # ==========================================
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_cards_dealt(players_data: Array, draw_count: int) -> void:
 	net_cards_dealt.emit(players_data, draw_count)
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_swap_phase_started(duration: float) -> void:
 	net_swap_phase_started.emit(duration)
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_swap_time_updated(seconds: float) -> void:
 	net_swap_time_updated.emit(seconds)
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_swap_phase_ended() -> void:
 	net_swap_phase_ended.emit()
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_card_swapped(p_id: int, h_idx: int, t_idx: int) -> void:
 	net_card_swapped.emit(p_id, h_idx, t_idx)
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_turn_started(active_p_id: int, active_group: String) -> void:
 	net_turn_started.emit(active_p_id, active_group)
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_cards_played(p_id: int, cards_data: Array, active_group: String) -> void:
 	var cards: Array[CardData] = []
 	for c_dict in cards_data:
 		cards.append(CardData.from_dict(c_dict))
 	net_cards_played.emit(p_id, cards, active_group)
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_blind_card_revealed(p_id: int, card_dict: Dictionary, is_valid: bool) -> void:
 	var card := CardData.from_dict(card_dict)
 	net_blind_card_revealed.emit(p_id, card, is_valid)
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_pile_burned(p_id: int, reason: String) -> void:
 	net_pile_burned.emit(p_id, reason)
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_pile_collected(p_id: int, count: int) -> void:
 	net_pile_collected.emit(p_id, count)
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_cards_drawn(p_id: int, count: int, cards_data: Array) -> void:
 	var drawn: Array[CardData] = []
 	for c_dict in cards_data:
 		drawn.append(CardData.from_dict(c_dict))
 	net_cards_drawn.emit(p_id, count, drawn)
 
-@rpc("call_local", "reliable")
+@rpc("reliable")
 func rpc_sync_game_won(winner_id: int) -> void:
 	net_game_won.emit(winner_id)

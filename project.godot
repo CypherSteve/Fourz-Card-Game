@@ -17,9 +17,13 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="Fours Card Game"
 config/description="Fours - A strategic 2-deck card game for 2+ players"
 config/version="1.0.0"
-run/main_scene="res://src/presentation/table_view.tscn"
+run/main_scene="res://src/presentation/main_menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 run/max_fps=60
+
+[autoload]
+
+GameNetwork="*res://src/network/network_manager.gd"
 
 [display]
 
